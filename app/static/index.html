@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Indian Stock Price Finder</title>
+    <link rel="stylesheet" href="/static/styles.css?v=4" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="phone hero-phone">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Indian market</p>
+            <h1>Stocks</h1>
+          </div>
+          <div id="statusBadge" class="status-badge">Ready</div>
+        </header>
+
+        <form id="quoteForm" class="search-card">
+          <label class="search-field">
+            <span>Search NSE / BSE stocks</span>
+            <input id="symbolInput" autocomplete="off" placeholder="Type Reliance, TCS, INFY..." />
+          </label>
+          <button type="submit">Search</button>
+        </form>
+
+        <section class="portfolio-card">
+          <p class="label">Current price</p>
+          <div id="currentPrice" class="price">--</div>
+          <p id="quoteMeta" class="muted">Press Search to see Indian stocks.</p>
+          <div class="spark-bars" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div id="changePill" class="change-pill neutral">--</div>
+        </section>
+
+        <section class="menu-grid">
+          <article class="tile highlight">
+            <span class="tile-icon">₹</span>
+            <strong id="previousClose">--</strong>
+            <small>Previous close</small>
+          </article>
+          <article class="tile">
+            <span class="tile-icon">↗</span>
+            <strong id="marketState">--</strong>
+            <small>Market state</small>
+          </article>
+          <article class="tile">
+            <span class="tile-icon">⌁</span>
+            <strong id="exchange">--</strong>
+            <small>Exchange</small>
+          </article>
+          <article class="tile">
+            <span class="tile-icon">◷</span>
+            <strong id="quoteTime">--</strong>
+            <small>Quote time</small>
+          </article>
+        </section>
+      </section>
+
+      <section class="phone list-phone">
+        <header class="panel-head">
+          <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+          <p class="eyebrow">Menu</p>
+          <h2>All Stocks</h2>
+        </header>
+
+        <section class="stock-board">
+          <div class="section-head">
+            <div>
+              <h3>Search Results</h3>
+              <p class="muted">Tap any stock card to load live price and history.</p>
+            </div>
+            <button id="clearSearch" class="icon-button" type="button" title="Show all">⌕</button>
+          </div>
+          <div id="searchResults" class="results-list" aria-live="polite"></div>
+        </section>
+
+        <section class="analytics-card">
+          <div class="section-head">
+            <div>
+              <h3>Historical Analytics</h3>
+              <p id="analyticsMeta" class="muted">Choose a stock to load analytics.</p>
+            </div>
+          </div>
+          <div class="analytics-grid">
+            <div>
+              <span>6M Return</span>
+              <strong id="periodReturn">--</strong>
+            </div>
+            <div>
+              <span>Trend</span>
+              <strong id="trendSignal">--</strong>
+            </div>
+            <div>
+              <span>Volatility</span>
+              <strong id="volatility">--</strong>
+            </div>
+            <div>
+              <span>High / Low</span>
+              <strong id="historyRange">--</strong>
+            </div>
+          </div>
+          <div id="historyBars" class="history-bars" aria-label="Recent historical close prices"></div>
+        </section>
+
+        <section class="prediction-card">
+          <div class="section-head">
+            <div>
+              <h3>ML Price Prediction</h3>
+              <p id="predictionMeta" class="muted">Choose a stock to train the model.</p>
+            </div>
+          </div>
+          <div id="predictionResults" class="prediction-grid" aria-live="polite">
+            <div class="prediction-empty">Predictions will appear here.</div>
+          </div>
+        </section>
+
+        <section class="validator">
+          <h3>Validate Your Price</h3>
+          <form id="validateForm" class="validate-grid">
+            <label>
+              <span>Expected</span>
+              <input id="expectedPrice" type="number" step="0.0001" min="0" placeholder="1340.50" />
+            </label>
+            <label>
+              <span>Tolerance %</span>
+              <input id="tolerance" type="number" step="0.1" min="0" max="100" value="0.5" />
+            </label>
+            <button type="submit">Validate</button>
+          </form>
+          <div id="validationResult" class="validation-result idle">Validation result will appear here.</div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/static/app.js?v=4"></script>
+  </body>
+</html>

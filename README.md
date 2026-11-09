@@ -27,7 +27,7 @@ Open the URL printed in the terminal, usually http://127.0.0.1:8000.
 - Searches Indian stocks by company name or symbol.
 - Displays previous close, absolute change, percent change, market state, and quote time.
 - Shows 6-month return, trend, annualized volatility, history high/low, and recent close-price bars.
-- Predicts 5, 15, and 30 trading day prices using the best validation result from Random Forest, Extra Trees, and Gradient Boosting.
+- Predicts 5, 10, and 15 trading day prices using the best validation result from Random Forest, Extra Trees, and Gradient Boosting.
 - Lets you enter an expected price and tolerance to validate whether your price matches the live market price.
 
 Market data is fetched from Yahoo Finance's public chart endpoint.

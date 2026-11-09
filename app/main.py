@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -428,9 +429,7 @@ def scan_under_500_stocks(max_price: float = 500.0) -> dict[str, Any]:
     The score is a transparent technical screening score, not a return forecast.
     Stocks without usable data or priced above max_price are excluded.
     """
-    screened = []
-    failures = []
-    for stock in UNDER_500_UNIVERSE:
+    def evaluate_stock(stock: dict[str, str]) -> tuple[dict[str, Any] | None, str | None]:
         symbol = stock["symbol"]
         try:
             history = fetch_yahoo_history(symbol, range_value="6mo", range_label="Last 6 months")
@@ -438,7 +437,7 @@ def scan_under_500_stocks(max_price: float = 500.0) -> dict[str, Any]:
             analytics = history["analytics"]
             current_price = float(points[-1]["close"])
             if current_price <= 0 or current_price > max_price:
-                continue
+                return None, None
 
             recent_volumes = [
                 float(point["volume"])
@@ -452,7 +451,7 @@ def scan_under_500_stocks(max_price: float = 500.0) -> dict[str, Any]:
             liquidity_score = min(20.0, float(np.log10(avg_volume + 1.0)) * 2.0)
             score = round(trend_score + momentum_score + volatility_score + liquidity_score, 1)
 
-            screened.append(
+            return (
                 {
                     **stock,
                     "current_price": round(current_price, 2),
@@ -463,11 +462,19 @@ def scan_under_500_stocks(max_price: float = 500.0) -> dict[str, Any]:
                     "screen_score": score,
                     "screen_label": "Higher score" if score >= 70 else "Watch" if score >= 55 else "Needs review",
                     "symbol_for_search": symbol,
-                }
+                },
+                None,
             )
-        except Exception as exc:
-            failures.append({"symbol": symbol, "reason": str(exc)})
+        except Exception:
+            return None, symbol
 
+    # A small worker pool keeps the first scan responsive without flooding the
+    # public market-data endpoint with dozens of simultaneous requests.
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(evaluate_stock, UNDER_500_UNIVERSE))
+
+    screened = [row for row, failed_symbol in results if row is not None]
+    failures = [failed_symbol for row, failed_symbol in results if failed_symbol is not None]
     screened.sort(key=lambda item: (item["screen_score"], item["average_daily_volume"]), reverse=True)
     return {
         "max_price": float(max_price),
@@ -476,7 +483,7 @@ def scan_under_500_stocks(max_price: float = 500.0) -> dict[str, Any]:
         "stocks": screened,
         "provider": "Yahoo Finance",
         "screened_at": datetime.now(timezone.utc).isoformat(),
-        "failed_symbols": [item["symbol"] for item in failures],
+        "failed_symbols": failures,
     }
 
 

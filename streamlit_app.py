@@ -136,11 +136,11 @@ st.markdown('<div class="eyebrow">AI-powered market research · NSE watchlist</d
 st.markdown('<div class="hero-title">Indian Equity Intelligence</div>', unsafe_allow_html=True)
 st.markdown('<div class="hero-subtitle">Discover NSE stocks trading at ₹500 or below, compare technical strength, and explore machine-learning forecasts.</div>', unsafe_allow_html=True)
 
-scan_col, scan_info_col = st.columns([1, 2.2], vertical_alignment="center")
+scan_col, scan_info_col = st.columns([1, 2.2])
 with scan_col:
     run_scan = st.button("⚡ Scan stocks under ₹500", type="primary", use_container_width=True)
 with scan_info_col:
-    st.caption("Live-price eligibility · 6-month trend and volatility · average volume · transparent 0–100 screening score")
+    st.caption("Latest available price filter · 6-month trend and volatility · average volume · transparent 0–100 screening score")
 
 if run_scan:
     try:

@@ -111,7 +111,9 @@ def cached_history(symbol: str) -> dict:
 
 
 @st.cache_data(ttl=900, show_spinner=False)
-def cached_predictions(symbol: str) -> dict:
+def cached_predictions(symbol: str, prediction_version: str = "horizons-5-10-15-v2") -> dict:
+    # prediction_version is part of Streamlit's cache key so older 5/15/30-day
+    # results cannot be reused after changing the forecast horizons.
     history = fetch_yahoo_history(normalize_symbol(symbol), range_value="5y", range_label="Last 5 years")
     return build_price_predictions(history)
 
@@ -202,7 +204,7 @@ if st.button("Generate 5 / 10 / 15 Day Predictions", type="primary", use_contain
     st.session_state.pop(prediction_state_key, None)
     try:
         with st.spinner("Training and validating the three prediction horizons..."):
-            trained_result = cached_predictions(selected_symbol)
+            trained_result = cached_predictions(selected_symbol, prediction_version="horizons-5-10-15-v2")
         actual_horizons = [item.get("horizon_days") for item in trained_result.get("predictions", [])]
         expected_horizons = list(PREDICTION_HORIZONS)
         if actual_horizons != expected_horizons:

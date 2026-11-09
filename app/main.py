@@ -393,7 +393,7 @@ def build_price_predictions(history: dict[str, Any]) -> dict[str, Any]:
 
     feature_rows = build_feature_rows(points)
     latest_features = feature_rows[-1:].copy()
-    horizons = [5, 15, 30]
+    horizons = [5, 10, 15]
     predictions = []
 
     for horizon in horizons:

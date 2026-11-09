@@ -18,6 +18,8 @@ from sklearn.metrics import mean_absolute_percentage_error
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
+PREDICTION_HORIZONS = (5, 10, 15)
+
 POPULAR_STOCKS = [
     {"symbol": "RELIANCE.NS", "name": "Reliance Industries", "sector": "Energy"},
     {"symbol": "TCS.NS", "name": "Tata Consultancy Services", "sector": "Technology"},
@@ -393,7 +395,7 @@ def build_price_predictions(history: dict[str, Any]) -> dict[str, Any]:
 
     feature_rows = build_feature_rows(points)
     latest_features = feature_rows[-1:].copy()
-    horizons = [5, 10, 15]
+    horizons = list(PREDICTION_HORIZONS)
     predictions = []
 
     for horizon in horizons:

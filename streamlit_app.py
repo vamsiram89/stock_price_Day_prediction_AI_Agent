@@ -123,7 +123,7 @@ def history_frame(history: dict) -> pd.DataFrame:
 
 
 st.title("Indian Stock Price Predictor")
-st.caption("Search NSE/BSE stocks, view live price analytics, and train ML forecasts for 5, 15, and 30 trading days.")
+st.caption("Search NSE/BSE stocks, view live price analytics, and train ML forecasts for 5, 10, and 15 trading days.")
 
 with st.container():
     st.markdown('<div class="dark-card">', unsafe_allow_html=True)
@@ -214,7 +214,7 @@ if prediction_result and prediction_result["symbol"] == normalize_symbol(selecte
             st.caption(f"Validation error: {item['validation_mape_percent']:.2f}%")
             st.markdown("</div>", unsafe_allow_html=True)
 else:
-    st.info("Click Train Prediction Model to generate 5, 15, and 30 day forecasts.")
+    st.info("Click Train Prediction Model to generate 5, 10, and 15 day forecasts.")
 st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown('<div class="dark-card">', unsafe_allow_html=True)

@@ -131,8 +131,61 @@ def history_frame(history: dict) -> pd.DataFrame:
     return frame.set_index("date")
 
 
-st.title("Indian Stock Price Predictor")
-st.caption("Search NSE/BSE stocks, view live price analytics, and train ML forecasts for 5, 10, and 15 trading days.")
+
+st.markdown('<div class="eyebrow">AI-powered market research · NSE watchlist</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-title">Indian Equity Intelligence</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-subtitle">Discover NSE stocks trading at ₹500 or below, compare technical strength, and explore machine-learning forecasts.</div>', unsafe_allow_html=True)
+
+scan_col, scan_info_col = st.columns([1, 2.2], vertical_alignment="center")
+with scan_col:
+    run_scan = st.button("⚡ Scan stocks under ₹500", type="primary", use_container_width=True)
+with scan_info_col:
+    st.caption("Live-price eligibility · 6-month trend and volatility · average volume · transparent 0–100 screening score")
+
+if run_scan:
+    try:
+        with st.spinner("Screening the NSE watchlist with the latest available market data..."):
+            st.session_state["under500_scan_results"] = cached_under_500_scan()
+        st.success(f"Scan complete. {st.session_state['under500_scan_results']['eligible_count']} stocks currently meet the ₹500 price filter.")
+    except Exception as exc:
+        st.error(f"Stock scan could not be completed: {exc}")
+
+scan_result = st.session_state.get("under500_scan_results")
+if scan_result:
+    st.markdown("### Under-₹500 opportunities")
+    st.caption(f"Scanned {scan_result['scanned_universe']} NSE symbols · {scan_result['eligible_count']} eligible · Data: {scan_result['provider']} · Score is a screening aid, not a buy recommendation.")
+    if scan_result["stocks"]:
+        top_cols = st.columns(3)
+        for col, item in zip(top_cols, scan_result["stocks"][:3]):
+            with col:
+                st.markdown('<div class="prediction-card">', unsafe_allow_html=True)
+                st.markdown(f"**{item['name']}**")
+                st.metric("Last available price", money(item["current_price"]), f"Score {item['screen_score']:.1f}/100")
+                st.caption(f"{item['symbol']} · {item['sector']} · {item['trend']}")
+                st.markdown("</div>", unsafe_allow_html=True)
+        scan_frame = pd.DataFrame([
+            {
+                "Company": item["name"], "Symbol": item["symbol"], "Sector": item["sector"],
+                "Price (₹)": item["current_price"], "6M return": f"{item['six_month_return_percent']:+.2f}%",
+                "Annual volatility": f"{item['annualized_volatility_percent']:.2f}%",
+                "Avg. daily volume": item["average_daily_volume"], "Screen score": item["screen_score"],
+                "Assessment": item["screen_label"],
+            }
+            for item in scan_result["stocks"]
+        ])
+        st.dataframe(scan_frame, use_container_width=True, hide_index=True)
+        score_frame = pd.DataFrame([
+            {"Stock": item["symbol"].replace(".NS", ""), "Score": item["screen_score"]}
+            for item in scan_result["stocks"][:10]
+        ]).set_index("Stock")
+        st.markdown("#### Top screening scores")
+        st.bar_chart(score_frame, use_container_width=True)
+        st.info("To view a stock's detailed chart and 5/15/30-day forecasts, select its symbol in the stock selector below. Scan results are cached for 30 minutes.")
+    else:
+        st.warning("No stocks in the selected NSE watchlist are currently priced at ₹500 or below. Try scanning again later.")
+    if scan_result.get("failed_symbols"):
+        st.caption(f"Market data was unavailable for {len(scan_result['failed_symbols'])} symbols during this scan.")
+
 
 with st.container():
     st.markdown('<div class="dark-card">', unsafe_allow_html=True)
@@ -149,6 +202,13 @@ if search_clicked or "matches" not in st.session_state:
         st.session_state.matches = cached_search(search_query)
 
 matches = st.session_state.matches
+if scan_result and scan_result.get("stocks"):
+    combined = {item["symbol"]: item for item in matches}
+    for item in scan_result["stocks"]:
+        combined[item["symbol"]] = item
+    matches = list(combined.values())
+    st.session_state.matches = matches
+
 if not matches:
     st.warning("No Indian stock matches found.")
     st.stop()

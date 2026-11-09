@@ -7,6 +7,7 @@ import streamlit as st
 
 from app.main import (
     POPULAR_STOCKS,
+    PREDICTION_HORIZONS,
     build_price_predictions,
     fetch_yahoo_history,
     fetch_yahoo_quote,
@@ -193,28 +194,83 @@ analytics_cols[3].metric("History High", money(analytics["period_high"], currenc
 
 st.markdown('<div class="dark-card">', unsafe_allow_html=True)
 st.subheader("ML Price Prediction")
-st.caption("The app trains Random Forest, Extra Trees, and Gradient Boosting models, then chooses the lowest validation error for each horizon.")
+st.caption("Generate separate 5, 10, and 15 trading-day forecasts. For each horizon, the app compares Random Forest, Extra Trees, and Gradient Boosting using a time-ordered validation split.")
 
-if st.button("Train Prediction Model", type="primary", use_container_width=True):
-    with st.spinner("Training models for 5, 15, and 30 trading days..."):
-        st.session_state.predictions = cached_predictions(selected_symbol)
+prediction_state_key = f"predictions_{normalize_symbol(selected_symbol)}"
 
-prediction_result = st.session_state.get("predictions")
-if prediction_result and prediction_result["symbol"] == normalize_symbol(selected_symbol):
+if st.button("Generate 5 / 10 / 15 Day Predictions", type="primary", use_container_width=True):
+    st.session_state.pop(prediction_state_key, None)
+    try:
+        with st.spinner("Training and validating the three prediction horizons..."):
+            trained_result = cached_predictions(selected_symbol)
+        actual_horizons = [item.get("horizon_days") for item in trained_result.get("predictions", [])]
+        expected_horizons = list(PREDICTION_HORIZONS)
+        if actual_horizons != expected_horizons:
+            raise ValueError(
+                f"Unexpected prediction horizons returned: {actual_horizons}. "
+                f"Expected: {expected_horizons}."
+            )
+        st.session_state[prediction_state_key] = trained_result
+        st.success("All three prediction horizons were generated successfully.")
+    except Exception as exc:
+        st.session_state.pop(prediction_state_key, None)
+        st.error(f"Prediction could not be generated: {exc}")
+
+prediction_result = st.session_state.get(prediction_state_key)
+if prediction_result:
+    prediction_items = prediction_result["predictions"]
     prediction_cols = st.columns(3)
-    for column, item in zip(prediction_cols, prediction_result["predictions"]):
+    for column, item in zip(prediction_cols, prediction_items):
         with column:
             st.markdown('<div class="prediction-card">', unsafe_allow_html=True)
             st.metric(
-                f"{item['horizon_days']} Days",
+                f"{item['horizon_days']} Trading Days",
                 money(item["predicted_price"], prediction_result["currency"]),
                 percent(item["change_percent"]),
             )
-            st.caption(f"{item['model']} · {item['confidence']} confidence")
-            st.caption(f"Validation error: {item['validation_mape_percent']:.2f}%")
+            st.caption(f"Selected model: {item['model']}")
+            st.caption(f"Validation MAPE: {item['validation_mape_percent']:.2f}%")
+            st.caption(f"Validation label: {item['confidence']} (not a probability)")
             st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("#### Forecast comparison")
+    comparison = pd.DataFrame(
+        [
+            {
+                "Horizon": f"{item['horizon_days']} trading days",
+                "Predicted price": money(item["predicted_price"], prediction_result["currency"]),
+                "Expected change": percent(item["change_percent"]),
+                "Selected model": item["model"],
+                "Validation MAPE": f"{item['validation_mape_percent']:.2f}%",
+                "Error label": item["confidence"],
+            }
+            for item in prediction_items
+        ]
+    )
+    st.dataframe(comparison, use_container_width=True, hide_index=True)
+
+    chart_rows = [
+        {"Forecast point": "Current", "Estimated price": prediction_result["current_price"]}
+    ] + [
+        {
+            "Forecast point": f"+{item['horizon_days']} days",
+            "Estimated price": item["predicted_price"],
+        }
+        for item in prediction_items
+    ]
+    forecast_chart = pd.DataFrame(chart_rows).set_index("Forecast point")
+    st.markdown("#### Current price vs. model forecasts")
+    st.line_chart(forecast_chart, use_container_width=True)
+
+    st.caption(
+        f"Model trained using {prediction_result['trained_on_sessions']:,} historical trading sessions. "
+        "Validation MAPE is measured on a historical holdout period; it is not a guarantee of future accuracy."
+    )
 else:
-    st.info("Click Train Prediction Model to generate 5, 10, and 15 day forecasts.")
+    st.info(
+        "Select a stock, then click **Generate 5 / 10 / 15 Day Predictions**. "
+        "The three forecast cards, comparison table, and chart will appear here."
+    )
 st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown('<div class="dark-card">', unsafe_allow_html=True)

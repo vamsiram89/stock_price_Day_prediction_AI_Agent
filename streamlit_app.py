@@ -13,6 +13,7 @@ from app.main import (
     fetch_yahoo_quote,
     fetch_yahoo_search,
     normalize_symbol,
+    scan_under_500_stocks,
 )
 
 
@@ -111,12 +112,17 @@ def cached_history(symbol: str) -> dict:
 
 
 @st.cache_data(ttl=900, show_spinner=False)
-def cached_predictions(symbol: str, prediction_version: str = "horizons-5-10-15-v2") -> dict:
+def cached_predictions(symbol: str, prediction_version: str = "horizons-5-15-30-v3") -> dict:
     # prediction_version is part of Streamlit's cache key so older 5/15/30-day
     # results cannot be reused after changing the forecast horizons.
     history = fetch_yahoo_history(normalize_symbol(symbol), range_value="5y", range_label="Last 5 years")
     return build_price_predictions(history)
 
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def cached_under_500_scan(scan_version: str = "nse-under-500-score-v1") -> dict:
+    return scan_under_500_stocks(max_price=500.0)
 
 def history_frame(history: dict) -> pd.DataFrame:
     rows = history["points"]
@@ -196,15 +202,15 @@ analytics_cols[3].metric("History High", money(analytics["period_high"], currenc
 
 st.markdown('<div class="dark-card">', unsafe_allow_html=True)
 st.subheader("ML Price Prediction")
-st.caption("Generate separate 5, 10, and 15 trading-day forecasts. For each horizon, the app compares Random Forest, Extra Trees, and Gradient Boosting using a time-ordered validation split.")
+st.caption("Generate separate 5, 15, and 30 trading-day forecasts. For each horizon, the app compares Random Forest, Extra Trees, and Gradient Boosting using a time-ordered validation split.")
 
 prediction_state_key = f"predictions_{normalize_symbol(selected_symbol)}"
 
-if st.button("Generate 5 / 10 / 15 Day Predictions", type="primary", use_container_width=True):
+if st.button("Generate 5 / 15 / 30 Day Predictions", type="primary", use_container_width=True):
     st.session_state.pop(prediction_state_key, None)
     try:
         with st.spinner("Training and validating the three prediction horizons..."):
-            trained_result = cached_predictions(selected_symbol, prediction_version="horizons-5-10-15-v2")
+            trained_result = cached_predictions(selected_symbol, prediction_version="horizons-5-15-30-v3")
         actual_horizons = [item.get("horizon_days") for item in trained_result.get("predictions", [])]
         expected_horizons = list(PREDICTION_HORIZONS)
         if actual_horizons != expected_horizons:
@@ -270,7 +276,7 @@ if prediction_result:
     )
 else:
     st.info(
-        "Select a stock, then click **Generate 5 / 10 / 15 Day Predictions**. "
+        "Select a stock, then click **Generate 5 / 15 / 30 Day Predictions**. "
         "The three forecast cards, comparison table, and chart will appear here."
     )
 st.markdown("</div>", unsafe_allow_html=True)

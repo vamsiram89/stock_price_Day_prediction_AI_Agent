@@ -18,7 +18,7 @@ from sklearn.metrics import mean_absolute_percentage_error
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
-PREDICTION_HORIZONS = (5, 10, 15)
+PREDICTION_HORIZONS = (5, 15, 30)
 
 POPULAR_STOCKS = [
     {"symbol": "RELIANCE.NS", "name": "Reliance Industries", "sector": "Energy"},
@@ -70,6 +70,43 @@ POPULAR_STOCKS = [
     {"symbol": "HDFCLIFE.NS", "name": "HDFC Life Insurance", "sector": "Insurance"},
     {"symbol": "SBILIFE.NS", "name": "SBI Life Insurance", "sector": "Insurance"},
     {"symbol": "SHRIRAMFIN.NS", "name": "Shriram Finance", "sector": "Financials"},
+]
+
+
+
+# A liquid, diversified NSE watchlist to screen dynamically. Eligibility is always
+# determined from the latest downloaded market price, never from a hard-coded price.
+UNDER_500_UNIVERSE = [
+    {"symbol": "ITC.NS", "name": "ITC", "sector": "Consumer"},
+    {"symbol": "ONGC.NS", "name": "ONGC", "sector": "Energy"},
+    {"symbol": "POWERGRID.NS", "name": "Power Grid", "sector": "Utilities"},
+    {"symbol": "NTPC.NS", "name": "NTPC", "sector": "Utilities"},
+    {"symbol": "COALINDIA.NS", "name": "Coal India", "sector": "Energy"},
+    {"symbol": "TATASTEEL.NS", "name": "Tata Steel", "sector": "Metals"},
+    {"symbol": "IOC.NS", "name": "Indian Oil", "sector": "Energy"},
+    {"symbol": "BPCL.NS", "name": "BPCL", "sector": "Energy"},
+    {"symbol": "PNB.NS", "name": "Punjab National Bank", "sector": "Banking"},
+    {"symbol": "BANKBARODA.NS", "name": "Bank of Baroda", "sector": "Banking"},
+    {"symbol": "CANBK.NS", "name": "Canara Bank", "sector": "Banking"},
+    {"symbol": "UNIONBANK.NS", "name": "Union Bank", "sector": "Banking"},
+    {"symbol": "IDFCFIRSTB.NS", "name": "IDFC First Bank", "sector": "Banking"},
+    {"symbol": "FEDERALBNK.NS", "name": "Federal Bank", "sector": "Banking"},
+    {"symbol": "YESBANK.NS", "name": "Yes Bank", "sector": "Banking"},
+    {"symbol": "IRFC.NS", "name": "IRFC", "sector": "Financials"},
+    {"symbol": "NHPC.NS", "name": "NHPC", "sector": "Utilities"},
+    {"symbol": "SJVN.NS", "name": "SJVN", "sector": "Utilities"},
+    {"symbol": "IREDA.NS", "name": "IREDA", "sector": "Financials"},
+    {"symbol": "GAIL.NS", "name": "GAIL", "sector": "Energy"},
+    {"symbol": "NMDC.NS", "name": "NMDC", "sector": "Metals"},
+    {"symbol": "HFCL.NS", "name": "HFCL", "sector": "Telecom"},
+    {"symbol": "BHEL.NS", "name": "BHEL", "sector": "Industrials"},
+    {"symbol": "REC.NS", "name": "REC", "sector": "Financials"},
+    {"symbol": "PFC.NS", "name": "Power Finance Corp", "sector": "Financials"},
+    {"symbol": "JIOFIN.NS", "name": "Jio Financial Services", "sector": "Financials"},
+    {"symbol": "WIPRO.NS", "name": "Wipro", "sector": "Technology"},
+    {"symbol": "TATAMOTORS.NS", "name": "Tata Motors", "sector": "Auto"},
+    {"symbol": "HINDALCO.NS", "name": "Hindalco", "sector": "Metals"},
+    {"symbol": "CIPLA.NS", "name": "Cipla", "sector": "Pharma"},
 ]
 
 app = FastAPI(title="Indian Stock Price Finder API", version="1.0.0")
@@ -382,6 +419,65 @@ def standard_deviation(values: list[float]) -> float:
     mean = average(values)
     variance = average([(value - mean) ** 2 for value in values])
     return variance ** 0.5
+
+
+
+def scan_under_500_stocks(max_price: float = 500.0) -> dict[str, Any]:
+    """Screen a curated NSE watchlist using current Yahoo Finance data.
+
+    The score is a transparent technical screening score, not a return forecast.
+    Stocks without usable data or priced above max_price are excluded.
+    """
+    screened = []
+    failures = []
+    for stock in UNDER_500_UNIVERSE:
+        symbol = stock["symbol"]
+        try:
+            history = fetch_yahoo_history(symbol, range_value="6mo", range_label="Last 6 months")
+            points = history["points"]
+            analytics = history["analytics"]
+            current_price = float(points[-1]["close"])
+            if current_price <= 0 or current_price > max_price:
+                continue
+
+            recent_volumes = [
+                float(point["volume"])
+                for point in points[-20:]
+                if point.get("volume") is not None and float(point["volume"]) > 0
+            ]
+            avg_volume = average(recent_volumes) if recent_volumes else 0.0
+            trend_score = 35.0 if analytics["trend"] == "Bullish" else 20.0 if analytics["trend"] == "Sideways" else 5.0
+            momentum_score = max(0.0, min(25.0, float(analytics["period_return_percent"]) * 1.25 + 12.5))
+            volatility_score = max(0.0, 20.0 - min(float(analytics["annualized_volatility_percent"]), 40.0) * 0.5)
+            liquidity_score = min(20.0, float(np.log10(avg_volume + 1.0)) * 2.0)
+            score = round(trend_score + momentum_score + volatility_score + liquidity_score, 1)
+
+            screened.append(
+                {
+                    **stock,
+                    "current_price": round(current_price, 2),
+                    "trend": analytics["trend"],
+                    "six_month_return_percent": round(float(analytics["period_return_percent"]), 2),
+                    "annualized_volatility_percent": round(float(analytics["annualized_volatility_percent"]), 2),
+                    "average_daily_volume": int(avg_volume),
+                    "screen_score": score,
+                    "screen_label": "Higher score" if score >= 70 else "Watch" if score >= 55 else "Needs review",
+                    "symbol_for_search": symbol,
+                }
+            )
+        except Exception as exc:
+            failures.append({"symbol": symbol, "reason": str(exc)})
+
+    screened.sort(key=lambda item: (item["screen_score"], item["average_daily_volume"]), reverse=True)
+    return {
+        "max_price": float(max_price),
+        "scanned_universe": len(UNDER_500_UNIVERSE),
+        "eligible_count": len(screened),
+        "stocks": screened,
+        "provider": "Yahoo Finance",
+        "screened_at": datetime.now(timezone.utc).isoformat(),
+        "failed_symbols": [item["symbol"] for item in failures],
+    }
 
 
 def build_price_predictions(history: dict[str, Any]) -> dict[str, Any]:
